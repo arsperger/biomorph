@@ -1,0 +1,29 @@
+# Cabal build artifacts
+dist-newstyle/
+cabal-project.local
+cabal-project.local~
+cabal.project.local
+.ghc.environment.*
+
+# Haskell object and interface files
+*.o
+*.hi
+*.dyn_o
+*.dyn_hi
+
+# GHCID session files
+.ghci_history
+.ghcid.*
+
+# Stack build artifacts (if you ever use Stack)
+.stack-work/
+
+# Editor-specific files
+*.swp
+*.swo
+*~
+.#*
+
+.devcontainer
+.vscode
+Task.txt
