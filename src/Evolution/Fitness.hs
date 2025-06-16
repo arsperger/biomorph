@@ -11,6 +11,9 @@ import qualified Data.List as L
 import Evolution.Types
 import Evolution.Render (renderBiomorphToImage, scaleImage)
 
+import Debug.Trace
+import Statistics.Sample (mean, variance)
+
 -- Calculate similarity between two images using normalized cross-correlation
 normalizedCrossCorrelation :: Image Pixel8 -> Image Pixel8 -> Double
 normalizedCrossCorrelation img1 img2 =
@@ -54,20 +57,38 @@ euclideanDistance img1 img2 =
         -- Convert images to vectors for faster computation
         vec1 = V.map fromIntegral $ imageData img1'
         vec2 = V.map fromIntegral $ imageData img2
-        
+
         -- Calculate squared differences
         squaredDiffs = V.zipWith (\a b -> (a - b)^2) vec1 vec2
+        --sumSquaredDiff = trace ("!!VEC1 " ++ show vec1) (V.sum squaredDiffs)
         sumSquaredDiff = V.sum squaredDiffs
-        
+
         -- Normalize by number of pixels
         normalizedDist = if V.null vec1 then 0 else sqrt (sumSquaredDiff) / fromIntegral (V.length vec1)
     in if V.length vec1 == 0 then 1.0 else 1.0 - (normalizedDist / 255.0)
+
+-- Calculate SSIM between two images
+ssim :: Image Pixel8 -> Image Pixel8 -> Double
+ssim img1 img2 =
+    let pixels1 = V.map fromIntegral $ imageData img1  -- Vector Double
+        pixels2 = V.map fromIntegral $ imageData img2
+        mu1 = mean pixels1
+        mu2 = mean pixels2
+        var1 = variance pixels1
+        var2 = variance pixels2
+        covar = V.sum (V.zipWith (*) pixels1 pixels2) / n - mu1 * mu2
+        n = fromIntegral $ V.length pixels1
+        c1 = (0.01 * 255)^2  -- Константы для стабилизации
+        c2 = (0.03 * 255)^2
+    in (2*mu1*mu2 + c1) * (2*covar + c2) / ((mu1^2 + mu2^2 + c1) * (var1 + var2 + c2))
 
 -- Calculate fitness of a biomorph against target image
 calculateFitness :: Image Pixel8 -> Biomorph -> Double
 calculateFitness targetImg biomorph =
     let biomorphImg = renderBiomorphToImage 150 150 biomorph
-        similarity = euclideanDistance targetImg biomorphImg
+    --let biomorphImg = trace ("!!Segments count is:\n" ++ show (length (segments biomorph)) ++ " indices is:" ++ show(activeSkeletalIndices biomorph)) (renderBiomorphToImage 150 150 biomorph)
+        --similarity = euclideanDistance targetImg biomorphImg
+        similarity = ssim targetImg biomorphImg
     in similarity
 
 -- Evaluate a biomorph's fitness against target and cache the result

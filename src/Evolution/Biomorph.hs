@@ -6,6 +6,7 @@ module Evolution.Biomorph
     , biomorphFromGenotype
     , createSimpleTestBiomorph
     , renderCreature
+    , selectRandomGenes
     , Gene(..)
     , Point(..)
     , Segment(..)
@@ -20,6 +21,7 @@ import Data.List (transpose)
 import qualified Data.Set as Set
 
 import Evolution.Types
+import Debug.Trace
 
 -- Create a random gene within bounds
 randomGene :: RandomGen g => (Int, Int) -> g -> (Gene, g)
@@ -57,6 +59,12 @@ createRandomGenotype gen =
         (activeIndexSelection, gen3) = generateDistinctIndices 7 (0, 14) gen2 -- Select 7 distinct indices from 0..14
     in (fullGenotype, activeIndexSelection, gen3)
 
+-- Select 7 active skeletal indices
+selectRandomGenes :: RandomGen g => g -> ([Int], g)
+selectRandomGenes gen =
+    let (activeIndexSelection, gen3) = generateDistinctIndices 7 (0, 14) gen -- Select 7 distinct indices from 0..14
+    in (activeIndexSelection, gen3)
+
 -- Calculate the 8 directional stems from genotype using active indices
 calculateStems :: Genotype -> [Int] -> Stems
 calculateStems genes activeIndices =
@@ -76,6 +84,7 @@ calculateStems genes activeIndices =
 renderBiomorph :: Genotype -> [Int] -> [Segment]
 renderBiomorph genotype activeIndices =
     let stems = calculateStems genotype activeIndices
+    --let stems = trace ("!!Rendering Indices is:" ++ show(activeIndices)) (calculateStems genotype activeIndices)
         len = geneValue $ last genotype -- Last gene is always length gene
     in renderCreature len stems 0 (Point 0 0) 0
 
@@ -104,6 +113,8 @@ mutateGene :: RandomGen g => Gene -> g -> (Gene, g)
 mutateGene (Gene val minVal maxVal) gen =
     let (direction, newGen) = random gen
         delta = if direction then 1 else -1
+    --let (delta1, newGen) = randomR (-2, 1) gen
+    --    delta = if delta1 >= 0 then delta1 + 1 else delta1
         newVal = max minVal (min maxVal (val + delta))
     in (Gene newVal minVal maxVal, newGen)
 
@@ -113,8 +124,12 @@ mutateBiomorph (Biomorph oldGenotype activeIdx _ _) gen =
     let (indexToMutate, gen1) = randomR (0, length oldGenotype - 1) gen
         (mutatedGene, gen2) = mutateGene (oldGenotype !! indexToMutate) gen1
         newGenotype = take indexToMutate oldGenotype ++ [mutatedGene] ++ drop (indexToMutate + 1) oldGenotype
-        newSegments = renderBiomorph newGenotype activeIdx -- Re-render with new genotype
-    in (Biomorph newGenotype activeIdx newSegments Nothing, gen2)
+        
+        (newIndexes, gen3) = selectRandomGenes gen2
+        newSegments = renderBiomorph newGenotype newIndexes -- Re-render with new genotype
+    in (Biomorph newGenotype newIndexes newSegments Nothing, gen3)
+        --newSegments = renderBiomorph newGenotype activeIdx -- Re-render with new genotype
+    --in (Biomorph newGenotype activeIdx newSegments Nothing, gen2)
 
 -- Create a biomorph from genotype and active indices
 biomorphFromGenotype :: Genotype -> [Int] -> Biomorph
