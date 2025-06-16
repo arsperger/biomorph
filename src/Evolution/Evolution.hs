@@ -13,6 +13,8 @@ import Evolution.Types
 import Evolution.Biomorph
 import Evolution.Fitness
 
+import Debug.Trace
+
 -- Generate population of random biomorphs
 generateInitialPopulation :: RandomGen g => g -> Int -> ([Biomorph], g)
 generateInitialPopulation gen size =
@@ -50,6 +52,19 @@ hasStagnated maxStagnantGens stats
             improvement = bestFitness - worstFitness
         in improvement < 0.0001  -- Very small improvement threshold
 
+-- Set new Indices
+setActiveIndices :: RandomGen g => g -> [Biomorph] -> ([Biomorph], g)
+setActiveIndices gen biomorphs =
+    let (indicesList, finalGen) = generateIndices gen (length biomorphs)
+        updated = zipWith (\bm idxs -> bm { activeSkeletalIndices = idxs }) biomorphs indicesList
+    in (updated, finalGen)
+  where
+    generateIndices g 0 = ([], g)
+    generateIndices g n =
+        let (idxs, g') = selectRandomGenes g
+            (rest, g'') = generateIndices g' (n-1)
+        in (idxs:rest, g'')
+
 -- Run one generation of evolution
 evolveGeneration :: RandomGen g => g -> Int -> Image Pixel8 -> [Biomorph] -> (g, [Biomorph], Double)
 evolveGeneration gen populationSize targetImg population =
@@ -59,12 +74,18 @@ evolveGeneration gen populationSize targetImg population =
         -- Select best individual as parent
         parent = selectBest evaluatedPopulation
         parentFitness = fromMaybe 0 (fitnessValue parent)
+        --parentFitness = trace ("!!Selected as best is:\n" ++ show (map geneValue (genotype (parent)))) (fromMaybe 0 (fitnessValue parent))
         
         -- Generate offspring (populationSize - 1 to keep parent in new population)
         (offspring, newGen) = generateOffspring gen (populationSize - 1) parent
         
+        --(offspring1, newGen1) = setActiveIndices newGen offspring
+
         -- New population is parent + offspring
         newPopulation = parent : offspring
+        --newPopulation = trace ("!!New newPopulation is:\n" ++ unlines (map showBiomorph offspring) ++ "Parent:\n" ++ show (map geneValue (genotype (parent)))) (parent : offspring)
+        --    where
+        --        showBiomorph bm = show (map geneValue (genotype bm))
     in (newGen, newPopulation, parentFitness)
 
 -- Run the full evolutionary process
@@ -84,16 +105,18 @@ runEvolution initialGen populationSize targetImg =
         -- Main evolution loop
         evolveLoop gen stats currentPop =
             let currentGen = length stats
-                (newGen, newPop, newFitness) = evolveGeneration gen populationSize targetImg currentPop
+                (newGen, newPop, newFitness) = trace ("DEBUG: Step " ++ show (generation (head stats))) (evolveGeneration gen populationSize targetImg currentPop)
+                --(newGen, newPop, newFitness) = evolveGeneration gen populationSize targetImg currentPop
                 
                 -- Check if fitness improved
                 prevFitness = fitness (head stats)
-                stagnantCount = if newFitness > prevFitness + 0.0001
+                stagnantCount = if newFitness > prevFitness + 0.000001
                                then 0
                                else stagnantGenerations (head stats) + 1
                 
                 -- New stats
-                newStats = EvolutionStats currentGen newFitness (evaluatePopulation targetImg newPop) stagnantCount : stats
+                newStats = trace ("DEBUG: newFitness is " ++ show newFitness)(EvolutionStats currentGen newFitness (evaluatePopulation targetImg newPop) stagnantCount : stats)
+                --newStats = EvolutionStats currentGen newFitness (evaluatePopulation targetImg newPop) stagnantCount : stats
             in
                 -- Check termination criteria
                 if stagnantCount >= 10 || currentGen >= 50  -- Add max generation limit

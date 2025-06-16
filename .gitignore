@@ -27,3 +27,5 @@ cabal.project.local
 .devcontainer
 .vscode
 Task.txt
+
+output/final_generation
